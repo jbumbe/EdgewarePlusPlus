@@ -97,7 +97,7 @@ def set_wallpaper(wallpaper_path: Path | str):
                         d.currentConfigGroup = Array("Wallpaper", "org.kde.image", "General");
                         d.writeConfig("Blur", true);
                         d.writeConfig("FillMode", 1);
-                        d.writeConfig("Image", "file://%s");
+                        d.writeConfig("Image", "file:/%s");
                     })""" % wallpaper_path
             args = "qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript \'%s\'" % script
             subprocess.Popen(args, shell=True)
