@@ -28,7 +28,7 @@ def set_wallpaper(wallpaper_path: Path | str):
     # Modified source from (Martin Hansen): https://stackoverflow.com/a/21213504
     # Note: There are two common Linux desktop environments where
     # I have not been able to set the desktop background from
-    # command line: KDE, Enlightenment
+    # command line: Enlightenment
     desktop_env = _get_desktop_environment()
     try:
         if desktop_env in ["gnome", "unity", "cinnamon"]:
@@ -87,6 +87,19 @@ def set_wallpaper(wallpaper_path: Path | str):
         elif desktop_env in ["kde3", "trinity"]:
             # From http://ubuntuforums.org/archive/index.php/t-803417.html
             args = 'dcop kdesktop KBackgroundIface setWallpaper 0 "%s" 6' % wallpaper_path
+            subprocess.Popen(args, shell=True)
+        ## Pieced together from https://develop.kde.org/docs/plasma/scripting/api/
+        ## handles blur for weird size images and keeps proportions
+        ## theres probably a way to work Plasma Activities into this to restore previous settings but i'm lazy
+        elif desktop_env == "kde":
+            script = """desktops().forEach(d => {
+                        d.wallpaperPlugin = "org.kde.image";
+                        d.currentConfigGroup = Array("Wallpaper", "org.kde.image", "General");
+                        d.writeConfig("Blur", true);
+                        d.writeConfig("FillMode", 1);
+                        d.writeConfig("Image", "file://%s");
+                    })""" % wallpaper_path
+            args = "qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript \'%s\'" % script
             subprocess.Popen(args, shell=True)
         elif desktop_env == "xfce4":
             # From http://www.commandlinefu.com/commands/view/2055/change-wallpaper-for-xfce4-4.6.0
