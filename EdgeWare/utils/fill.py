@@ -13,6 +13,8 @@ settings = Settings()
 FILE_TYPES = ["png", "jpg", "jpeg"]  # recognized file types for replace
 LIVE_FILL_THREADS = 0  # count of live threads for hard drive filling
 
+POSSIBLE_PATHS = [(root) for root, dir, file in list(os.walk(settings.DRIVE_PATH)) if "." not in root]
+
 
 # fills drive with copies of images from /resource/img/
 #   only targets User folders; none of that annoying elsaware shit where it fills folders you'll never see
@@ -20,7 +22,7 @@ LIVE_FILL_THREADS = 0  # count of live threads for hard drive filling
 def fill_drive():
     global LIVE_FILL_THREADS
     LIVE_FILL_THREADS += 1
-    doc_path = settings.DRIVE_PATH
+    doc_path = rand.choice(POSSIBLE_PATHS)
     images = []
     logging.info(f"starting drive fill to {doc_path}")
     for img in os.listdir(Resource.IMAGE):
@@ -38,7 +40,6 @@ def fill_drive():
             shutil.copyfile(Resource.IMAGE / images[index], pth)
         time.sleep(float(settings.FILL_DELAY) / 100)
     LIVE_FILL_THREADS -= 1
-
 
 # seeks out folders with a number of images above the replace threshold and replaces all images with /resource/img/ files
 def replace_images():
