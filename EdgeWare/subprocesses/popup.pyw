@@ -509,6 +509,7 @@ def run():
             loc_x = monitor.x + monitor.width - (resized_image.width)
             loc_y = monitor.y + monitor.height - (resized_image.height)
 
+    root.overrideredirect(1)
     root.geometry(f"{resized_image.width + border_wid_const - 1}x{resized_image.height + border_wid_const - 1}+{loc_x}+{loc_y}")
 
     if animated_gif:
