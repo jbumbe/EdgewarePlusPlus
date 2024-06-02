@@ -3104,7 +3104,7 @@ def show_window():
 
 def explorerView(url):
     try:
-        subprocess.Popen(f'explorer "{url}"')
+        utils.open_directory(url)
     except Exception as e:
         logging.warning(f"failed to open explorer view\n\tReason: {e}")
         messagebox.showerror("Explorer Error", "Failed to open explorer view.")
@@ -3541,8 +3541,7 @@ def getPresets() -> list[str]:
 
 def applyPreset(name: str):
     try:
-        os.remove(Data.CONFIG)
-        shutil.copyfile(Data.PRESETS / f"{name}.cfg", Data.CONFIG)
+        shutil.copyfile(Data.PRESETS / f"{name.lower()}.cfg", Data.CONFIG)
         refresh()
     except Exception as e:
         messagebox.showerror("Error", f"Failed to load preset.\n\n{e}")
