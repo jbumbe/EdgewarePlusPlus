@@ -947,7 +947,7 @@ def show_window():
     resourceFrame = Frame(root)
     exportResourcesButton = Button(resourceFrame, text="Export Resource Pack", command=exportResource)
     importResourcesButton = Button(resourceFrame, text="Import Resource Pack", command=lambda: importResource(root))
-    saveExitButton = Button(root, text="Save & Exit", command=lambda: write_save(in_var_group, in_var_names, safewordVar, True))
+    saveExitButton = Button(resourceFrame, text="Save & Exit", command=lambda: write_save(in_var_group, in_var_names, safewordVar, True))
 
     theme_types = ["Original", "Dark", "The One", "Ransom", "Goth", "Bimbo"]
 
@@ -2593,7 +2593,7 @@ def show_window():
                         mood_dict = json.loads(mood.read())
                         for c in mediaTree.get_children():
                             value = mediaTree.item(c, "values")
-                            if value[0] in mood_dict["media"]:
+                            if len(value) > 0 and value[0] in mood_dict["media"]:
                                 mediaTree.change_state(value[0], "checked")
                 except Exception as e:
                     logging.warning(f"error checking media treeview nodes. {e}")
@@ -2643,7 +2643,7 @@ def show_window():
                         mood_dict = json.loads(mood.read())
                         for c in captionsTree.get_children():
                             value = captionsTree.item(c, "values")
-                            if value[0] in mood_dict["captions"]:
+                            if len(value) > 0 and value[0] in mood_dict["captions"]:
                                 captionsTree.change_state(value[0], "checked")
                 except Exception as e:
                     logging.warning(f"error checking caption treeview nodes. {e}")
@@ -2686,7 +2686,7 @@ def show_window():
                         mood_dict = json.loads(mood.read())
                         for c in promptsTree.get_children():
                             value = promptsTree.item(c, "values")
-                            if value[0] in mood_dict["prompts"]:
+                            if len(value) > 0 and value[0] in mood_dict["prompts"]:
                                 promptsTree.change_state(value[0], "checked")
                 except Exception as e:
                     logging.warning(f"error checking prompt treeview nodes. {e}")
@@ -2732,7 +2732,7 @@ def show_window():
                         mood_dict = json.loads(mood.read())
                         for c in webTree.get_children():
                             value = webTree.item(c, "values")
-                            if value[0] in mood_dict["web"]:
+                            if len(value) > 0 and value[0] in mood_dict["web"]:
                                 webTree.change_state(value[0], "checked")
                 except Exception as e:
                     logging.warning(f"error checking web treeview nodes. {e}")
@@ -2782,7 +2782,7 @@ def show_window():
                     for f in logs:
                         if os.path.splitext(f)[0] == os.path.splitext(log_file)[0]:
                             continue
-                        e = os.path.splitext(f)[1].lower()
+                        e = os.path.splitext(f)[1]
                         if e == ".txt":
                             os.remove(LOG_PATH / f)
                     logNum = len(os.listdir(LOG_PATH)) if os.path.exists(LOG_PATH) else 0
@@ -2826,7 +2826,7 @@ def show_window():
     presetFrame = Frame(tabFile, borderwidth=5, relief=RAISED)
     dropdownSelectFrame = Frame(presetFrame)
 
-    style_list = [_.split(".")[0].capitalize() for _ in getPresets() if _.endswith(".cfg")]
+    style_list = [_.split(".")[0] for _ in getPresets() if _.endswith(".cfg")]
     logging.info(f"pulled style_list={style_list}")
     styleStr = StringVar(root, style_list.pop(0))
 
@@ -2842,7 +2842,7 @@ def show_window():
 
     def doSave() -> bool:
         name_ = simpledialog.askstring("Save Preset", "Preset name")
-        existed = os.path.exists(Data.PRESETS / f"{name_.lower()}.cfg")
+        existed = os.path.exists(Data.PRESETS / f"{name_}.cfg")
         if name_ != None and name != "":
             write_save(in_var_group, in_var_names, safewordVar, False)
             if existed:
@@ -3551,8 +3551,8 @@ def applyPreset(name: str):
 def savePreset(name: str) -> bool:
     try:
         if name is not None and name != "":
-            shutil.copyfile(Data.CONFIG, Data.PRESETS / f"{name.lower()}.cfg")
-            with open(Data.PRESETS / f"{name.lower()}.cfg", "rw") as file:
+            shutil.copyfile(Data.CONFIG, Data.PRESETS / f"{name}.cfg")
+            with open(Data.PRESETS / f"{name}.cfg", "rw") as file:
                 file_json = json.loads(file.readline())
                 file_json["drivePath"] = "C:/Users/"
                 file.write(json.dumps(file_json))
