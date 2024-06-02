@@ -12,3 +12,4 @@ requests
 screeninfo
 sounddevice
 ttkwidgets
+easygui

@@ -11,6 +11,7 @@ from PIL import Image
 from utils import utils
 from utils.paths import Data, Defaults, Process, Resource
 from utils.settings import Settings
+import easygui
 
 settings = Settings()
 
@@ -20,6 +21,7 @@ class TrayHandler:
     def __init__(self, hiber_wait):
         self.root = tk.Tk()
         self.root.title("Edgeware")
+        self.root.simpledialog = simpledialog
         self.hiber_wait = hiber_wait
 
         self.option_list = [pystray.MenuItem("Edgeware Menu", print), pystray.MenuItem("Panic", self.try_panic)]
@@ -57,7 +59,7 @@ class TrayHandler:
         logging.info("attempting tray panic")
         if not settings.PANIC_DISABLED:
             if settings.TIMER_MODE:
-                pass_ = simpledialog.askstring("Panic", "Enter Panic Password")
+                pass_ = easygui.enterbox("Enter Panic Password")
                 t_hash = None if pass_ is None or pass_ == "" else hashlib.sha256(pass_.encode(encoding="ascii", errors="ignore")).hexdigest()
                 if t_hash == self.hashedPass:
                     # revealing hidden files
