@@ -17,7 +17,7 @@ from tkinter import messagebox
 import playsound as ps
 from utils import utils
 from utils.booru import BooruDownloader, download_web_resources
-from utils.fill import LIVE_FILL_THREADS, fill_drive, replace_images
+import utils.fill as df #import LIVE_FILL_THREADS, fill_drive, replace_images
 from utils.paths import Data, Defaults, Process, Resource
 from utils.settings import Settings
 from utils.tray import TrayHandler
@@ -43,6 +43,10 @@ PLAYING_AUDIO = False  # audio thread flag
 REPLACING_LIVE = False  # replace thread flag
 HAS_PROMPTS = False  # can use prompts flag
 MITOSIS_LIVE = False  # flag for if the mitosis mode popup has been spawned
+FILL_THREAD_ACTIVE = False
+
+FILL_THREADS = []
+
 
 # default data for generating working default asset resource folder
 DEFAULT_WEB = '{"urls":["https://duckduckgo.com/"], "args":["?q=why+are+you+gay"]}'
@@ -82,6 +86,31 @@ wallpaper_wait = thread.Event()
 running_hibernate = thread.Event()
 pump_scare_audio = thread.Event()
 corruption_wait = thread.Event()
+
+class KThread(thread.Thread):
+    def __init__(self, *args, **keywords):
+        thread.Thread.__init__(self, *args, **keywords)
+        self.killed = False
+    def start(self):
+        self.__run_backup = self.run
+        self.run = self.__run
+        thread.Thread.start(self)
+    def __run(self):
+        sys.settrace(self.globaltrace)
+        self.__run_backup()
+        self.run = self.__run_backup
+    def globaltrace(self, frame, why, arg):
+        if why == 'call':
+            return self.localtrace
+        else:
+            return None
+    def localtrace(self, frame, why, arg):
+        if self.killed:
+            if why == 'line':
+                raise SystemExit()
+        return self.localtrace
+    def kill(self):
+        self.killed = True
 
 # start init portion, check resources, config, etc.
 try:
@@ -339,6 +368,9 @@ def main():
         logging.info("start rotate_wallpapers thread")
         thread.Thread(target=rotate_wallpapers).start()
 
+    # start thread for fill thread spawner
+    thread.Thread(target=lambda: fill_thread_handler()).start()
+
     # run annoyance thread or do hibernate mode
     if settings.HIBERNATE_MODE:
         logging.info("starting in hibernate mode")
@@ -361,14 +393,15 @@ def main():
             if settings.HIBERNATE_TRUTH == "Chaos":
                 try:
                     global HIBERNATE_TYPE
-                    HIBERNATE_TYPE = rand.choice(["Original", "Spaced", "Glitch", "Ramp", "Pump-Scare"])
+                    settings.HIBERNATE_TYPE = rand.choice(["Original", "Spaced", "Glitch", "Ramp", "Pump-Scare"])
                     with open(Data.CHAOS_TYPE, "w") as f:
-                        f.write(HIBERNATE_TYPE)
-                    print(f"hibernate type is chaos, and has switched to {HIBERNATE_TYPE}")
+                        f.write(settings.HIBERNATE_TYPE)
+                    print(f"hibernate type is chaos, and has switched to {settings.HIBERNATE_TYPE}")
                 except Exception as e:
                     logging.warning(f"failed to successfully run chaos hibernate.\n\tReason: {e}")
             hiber_wait.wait(float(wait_time))
             running_hibernate.clear()
+            activate_fill_thread()
             if settings.HIBERNATE_TYPE != "Pump-Scare":
                 wallpaper_check(Resource.WALLPAPER)
                 wallpaper_wait.clear()
@@ -377,9 +410,10 @@ def main():
                     print(f"running original hibernate. number of popups estimated between {int(settings.WAKEUP_ACTIVITY / 2)} and {settings.WAKEUP_ACTIVITY}.")
                     for i in range(0, rand.randint(int(settings.WAKEUP_ACTIVITY / 2), settings.WAKEUP_ACTIVITY)):
                         roll_for_initiative()
+                    time.sleep(settings.HIBERNATE_LENGTH)
                 except Exception as e:
                     logging.warning(f"failed to successfully run {HIBERNATE_TYPE} hibernate.\n\tReason: {e}")
-            if HIBERNATE_TYPE == "Spaced":
+            if settings.HIBERNATE_TYPE == "Spaced":
                 try:
                     end_time = time.monotonic() + float(settings.HIBERNATE_LENGTH)
                     print(f"running spaced hibernate. current time is {time.monotonic()}, end time is {end_time}")
@@ -388,7 +422,7 @@ def main():
                         time.sleep(float(settings.DELAY) / 1000.0)
                 except Exception as e:
                     logging.warning(f"failed to successfully run {HIBERNATE_TYPE} hibernate.\n\tReason: {e}")
-            if HIBERNATE_TYPE == "Glitch":
+            if settings.HIBERNATE_TYPE == "Glitch":
                 try:
                     glitch_sleep = settings.HIBERNATE_LENGTH / settings.WAKEUP_ACTIVITY
                     total_time = time.monotonic()
@@ -417,7 +451,7 @@ def main():
                     roll_for_initiative()
                 except Exception as e:
                     logging.warning(f"failed to successfully run {HIBERNATE_TYPE} hibernate.\n\tReason: {e}")
-            if HIBERNATE_TYPE == "Ramp":
+            if settings.HIBERNATE_TYPE == "Ramp":
                 try:
                     print(
                         f"hibernate type is ramp. ramping up speed for {settings.HIBERNATE_LENGTH}, max speed is {settings.DELAY*0.9}, and popups at max speed is {settings.WAKEUP_ACTIVITY}"
@@ -442,17 +476,20 @@ def main():
                         time.sleep(float(settings.DELAY * 0.9) / 1000.0)
                 except Exception as e:
                     logging.warning(f"failed to successfully run {HIBERNATE_TYPE} hibernate.\n\tReason: {e}")
-            if HIBERNATE_TYPE == "Pump-Scare":
+            if settings.HIBERNATE_TYPE == "Pump-Scare":
                 try:
                     print("hibernate type is pump-scare.")
                     roll_for_initiative()
                 except Exception as e:
                     logging.warning(f"failed to successfully run {HIBERNATE_TYPE} hibernate.\n\tReason: {e}")
             time.sleep(0.5)
+            deactivate_fill_thread()
             running_hibernate.set()
+
 
     else:
         logging.info("starting annoyance loop")
+        activate_fill_thread()
         annoyance()
 
 
@@ -510,12 +547,32 @@ def annoyance():
         if not MITOSIS_LIVE and (settings.MITOSIS_MODE or settings.LOWKEY_MODE) and HAS_IMAGES:
             subprocess.Popen([sys.executable, Process.POPUP]) if settings.MOOD_OFF else subprocess.Popen([sys.executable, Process.POPUP, f"-{MOOD_ID}"])
             MITOSIS_LIVE = True
-        if settings.FILL_MODE and LIVE_FILL_THREADS < settings.MAX_FILL_THREADS:
-            thread.Thread(target=fill_drive).start()
-        if settings.REPLACE_MODE and not REPLACING_LIVE:
-            thread.Thread(target=replace_images).start()
+        # if settings.REPLACE_MODE and not REPLACING_LIVE:
+        #     thread.Thread(target=replace_images).start()
         time.sleep(float(settings.DELAY) / 1000.0)
 
+def activate_fill_thread():
+    global FILL_THREAD_ACTIVE
+    FILL_THREAD_ACTIVE = True
+
+def deactivate_fill_thread():
+    global FILL_THREAD_ACTIVE
+    FILL_THREAD_ACTIVE = False
+
+def fill_thread_handler():
+    global FILL_THREAD_ACTIVE
+
+    while True:
+        if FILL_THREAD_ACTIVE:
+            if settings.FILL_MODE and df.LIVE_FILL_THREADS < settings.MAX_FILL_THREADS:
+                thrd = KThread(target=df.fill_drive)
+                FILL_THREADS.append(thrd)
+                thrd.start()
+        else:
+            while len(FILL_THREADS) > 0:
+                thrd = FILL_THREADS.pop()
+                thrd.kill()
+        time.sleep(float(settings.DELAY) / 1000.0)
 
 # independently attempt to do all active settings with probability equal to their freq value
 def roll_for_initiative():
